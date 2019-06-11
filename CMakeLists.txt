@@ -35,6 +35,8 @@ if (WIN32)
     add_definitions(-DD3D9_OS_DESKTOP)
     add_definitions(-D_HAS_EXCEPTIONS=0)
 
+    set(SDL2LIB_SUFFIXES "prebuilt/win32/${MSVC_CXX_ARCHITECTURE_ID}")
+    
     set(CMAKE_CXX_FLAGS "-std=c++11")
 elseif (ANDROID)
     # Android
@@ -89,7 +91,15 @@ set_property(GLOBAL PROPERTY PREDEFINED_TARGETS_FOLDER "CMakeTargets")
 include(FindPkgMacros)
 include(ProjectCMakeModule)
 
+# Find SDL2 library for all projects.
+set(SDL2DIR "${CMAKE_CURRENT_SOURCE_DIR}/Dependencies/SDL2" CACHE PATH "SDL2 library path")
+find_package(SDL2)
 
+if (NOT SDL2_FOUND)
+    message(FATAL_ERROR "Cound not find dependency: SDL2")
+endif ()
+
+# Find DirectX 9 for all projects.
 find_package(DirectX)
 
 if (NOT DirectX9_FOUND)

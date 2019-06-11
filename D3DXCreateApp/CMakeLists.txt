@@ -12,6 +12,7 @@ set_project_name(D3DXCreateApp)
 include_directories(
     "${CMAKE_CURRENT_SOURCE_DIR}/Include"
     "${DirectX9_INCLUDE_DIR}"
+    "${SDL2_INCLUDE_DIR}"
     )
 
 
@@ -32,6 +33,7 @@ add_executable(
 
 target_link_libraries(
     ${LIB_NAME}
+    ${SDL2_LIBRARY}
     ${DirectX9_LIBRARIES}
     )
 
