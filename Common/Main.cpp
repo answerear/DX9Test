@@ -22,21 +22,18 @@
  * SOFTWARE.
  ******************************************************************************/
 
-#ifndef __D3D_INIT_APP_H__
-#define __D3D_INIT_APP_H__
-
-
 #include "D3DApplication.h"
 
+extern CD3DApplication *g_pApp;
 
-class CD3DInitApp : public CD3DApplication
+int main(int argc, char *argv[])
 {
-public:
-    /// Constructor.
-    CD3DInitApp();
-    /// Destructor.
-    virtual ~CD3DInitApp();
-};
+    if (NULL == g_pApp)
+		return -1;
 
+    g_pApp->Init();
+    g_pApp->Run();
+    g_pApp->Release();
 
-#endif  /*__D3D_INIT_APP_H__*/
+    return 0;
+}

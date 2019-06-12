@@ -1,160 +1,268 @@
+﻿/*******************************************************************************
+ * MIT License
+ *
+ * Copyright(c) 2019 Aaron Wang
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files(the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sub-license, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions :
+ *
+ * The above copyright notice and this permission notice shall be included in 
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ ******************************************************************************/
 
-#include "Utility.h"
+#include "D3DApplication.h"
+#include "D3DWindow.h"
 
-CD3DApplication *g_pApp;
+
+//------------------------------------------------------------------------------
+
+CD3DApplication *g_pApp = nullptr;
+
+//------------------------------------------------------------------------------
+
+static int AppEventWatcher(void *userdata, SDL_Event *event)
+{
+    switch (event->type)
+    {
+    case SDL_APP_DIDENTERBACKGROUND:
+        {
+            g_pApp->applicationDidEnterBackground();
+        }
+        break;
+    case SDL_APP_WILLENTERFOREGROUND:
+        {
+            g_pApp->applicationWillEnterForeground();
+        }
+        break;
+    case SDL_APP_TERMINATING:
+        {
+            g_pApp->applicationWillTerminate();
+        }
+        break;
+    case SDL_APP_LOWMEMORY:
+        {
+            g_pApp->applicationLowMemory();
+        }
+        break;
+    }
+
+    return 0;
+}
+
+//------------------------------------------------------------------------------
 
 CD3DApplication::CD3DApplication()
-: m_hInstance(NULL)
-, m_hWnd(NULL)
-, m_lpszClassName(NULL)
-, m_lpszWindowName(NULL)
-, m_nWndXPos(0)
-, m_nWndYPos(0)
-, m_nWndWidth(0)
-, m_nWndHeight(480)
-, m_dwStyle(0)
-, m_dwExStyle(0)
-, m_uIconID(0)
-, m_uMenuID(0)
-, m_hMenu(NULL)
+    : mWindow(nullptr)
 {
-	g_pApp = this;
+    g_pApp = this;
 }
+
+//------------------------------------------------------------------------------
 
 CD3DApplication::~CD3DApplication()
 {
-	SAFE_DELETE_ARRAY(m_lpszClassName);
-	SAFE_DELETE_ARRAY(m_lpszWindowName);
+    g_pApp = nullptr;
 }
 
-BOOL CD3DApplication::InitInstance(HINSTANCE hInstance)
+//------------------------------------------------------------------------------
+
+bool CD3DApplication::Init()
 {
-	PreInitInstance();
+    bool ret = false;
 
-	m_hInstance = hInstance;
+    do
+    {
+        if (SDL_Init(0) != 0)
+        {
+            const char *error = SDL_GetError();
+            break;
+        }
 
-	WNDCLASSEX wcex;
+        if (SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_EVENTS | SDL_INIT_TIMER) 
+            != 0)
+        {
+            const char *error = SDL_GetError();
+            break;
+        }
 
-	wcex.cbSize = sizeof(WNDCLASSEX);
-	wcex.style			= CS_DBLCLKS|CS_VREDRAW|CS_HREDRAW;
-	wcex.lpfnWndProc	= (WNDPROC)WndProc;
-	wcex.cbClsExtra		= 0;
-	wcex.cbWndExtra		= 0;
-	wcex.hInstance		= m_hInstance;
-	if(m_uIconID)
-		wcex.hIcon		= ::LoadIcon(m_hInstance, MAKEINTRESOURCE(m_uIconID));
-	else
-		wcex.hIcon		= ::LoadIcon(NULL, (LPCTSTR)IDI_APPLICATION);
-	wcex.hCursor		= ::LoadCursor(m_hInstance,IDC_ARROW);
-	wcex.hbrBackground	= (HBRUSH)GetStockObject(BLACK_BRUSH);
-	wcex.lpszMenuName	= NULL;
-	wcex.lpszClassName	= m_lpszClassName;
-	wcex.hIconSm		= NULL;
+        SDL_AddEventWatch(AppEventWatcher, nullptr);
 
-	if (!::RegisterClassEx(&wcex))
-		return FALSE;
+        if (!InitD3D())
+        {
+            break;
+        }
 
-	m_hWnd = ::CreateWindowEx(
-		m_dwExStyle, 
-		m_lpszClassName, 
-		m_lpszWindowName,
-		m_dwStyle, 
-		m_nWndXPos, 
-		m_nWndYPos, 
-		m_nWndWidth, 
-		m_nWndHeight, 
-		NULL, 
-		NULL, 
-		m_hInstance, 
-		NULL);
+        ret = true;
+    } while (0);
 
-	if (NULL == m_hWnd)
-		return FALSE;
-
-	if (0 != m_uMenuID)
-	{
-		m_hMenu = ::LoadMenu(m_hInstance, MAKEINTRESOURCE(m_uMenuID));
-		if (NULL == m_hMenu)
-			return FALSE;
-	}
-
-	::ShowWindow(m_hWnd, SW_SHOWNORMAL);
-	::UpdateWindow(m_hWnd);
-
-	if (!InitD3D())
-		return FALSE;
-
-	return TRUE;
+	return ret;
 }
 
-int CD3DApplication::Run()
+//------------------------------------------------------------------------------
+
+bool CD3DApplication::Run()
 {
-	MSG msg;
+    applicationDidFinishLaunching();
 
-	static DWORD dwLastTime = timeGetTime();
-	while (1)
-	{
-		if (::PeekMessage(&msg, NULL, 0, 0, PM_NOREMOVE))
-		{
-			if (!::GetMessage(&msg, NULL, 0, 0))
-				break;
+    bool isRunning = true;
 
-			::TranslateMessage(&msg);
-			::DispatchMessage(&msg);
-		}
-		else
-		{
-			DWORD dwCurTime = timeGetTime();
-			DWORD delta =  dwCurTime - dwLastTime;
-			if (!RenderD3D(delta))
-				break;
-			dwLastTime = dwCurTime;
-		}
-	}
+    while (isRunning)
+    {
+        // Poll events.
+        isRunning = PollEvents();
 
-	return 0;
+        if (!isRunning)
+            break;
+
+        // Render one frame.
+        RenderOneFrame();
+    }
+
+    applicationWillTerminate();
+
+    return true;
 }
 
-int CD3DApplication::ExitInstance()
+//------------------------------------------------------------------------------
+
+void CD3DApplication::Release()
 {
-	ReleaseD3D();
-	return 0;
+    SDL_Quit();
 }
 
-void CD3DApplication::PreInitInstance()
+//------------------------------------------------------------------------------
+
+bool CD3DApplication::InitD3D()
 {
-	int nLength = _tcslen(DEF_WNDCLASSNAME);
-	m_lpszClassName = new TCHAR[nLength+1];
-	memset(m_lpszClassName, 0, sizeof(TCHAR)*(nLength+1));
-	_tcsncpy(m_lpszClassName, DEF_WNDCLASSNAME, nLength);
+    bool ret = false;
 
-	nLength = _tcslen(DEF_WNDTITLENAME);
-	m_lpszWindowName = new TCHAR[nLength+1];
-	memset(m_lpszWindowName, 0, sizeof(TCHAR)*(nLength+1));
-	_tcsncpy(m_lpszWindowName, DEF_WNDTITLENAME, nLength);
+    do 
+    {
+        // 创建D3D9对象
+        mD3D = ::Direct3DCreate9(D3D_SDK_VERSION);
+        if (nullptr == mD3D)
+        {
+            break;
+        }
 
-	m_nWndXPos = CW_USEDEFAULT;
-	m_nWndYPos = CW_USEDEFAULT;
-	m_nWndWidth = DEF_SCREENWIDTH;
-	m_nWndHeight = DEF_SCREENHEIGHT;
+        // 输出设备信息
+        UINT uAdapter = 0;
+        for (uAdapter = 0; uAdapter < mD3D->GetAdapterCount(); ++uAdapter)
+        {
+            D3DADAPTER_IDENTIFIER9 d3dai;
+            D3DDISPLAYMODE d3ddm;
+            mD3D->GetAdapterIdentifier(uAdapter, 0, &d3dai);
+            mD3D->GetAdapterDisplayMode(uAdapter, &d3ddm);
+        }
 
-	m_dwStyle = WS_VISIBLE|WS_OVERLAPPED|WS_MINIMIZEBOX|WS_SYSMENU|WS_CAPTION;
-	m_dwExStyle = 0;
+        ret = true;
+    } while (0);
 
-	m_uIconID = 0;
-	m_uMenuID = 0;
+    return ret;
 }
 
-LRESULT CALLBACK CD3DApplication::WndProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-	switch (uMsg)
-	{
-	case WM_DESTROY:
-		::PostQuitMessage(0);
-		break;
-	default:
-		return g_pApp->MessageProc(hWnd, uMsg, wParam, lParam);
-	}
+//------------------------------------------------------------------------------
 
-	return 0;
+bool CD3DApplication::PollEvents()
+{
+    bool ret = true;
+    SDL_Event ev;
+
+    while (SDL_PollEvent(&ev) != 0)
+    {
+        switch (ev.type)
+        {
+        case SDL_QUIT:
+        {
+            ret = false;
+        }
+        break;
+        }
+    }
+
+    return ret;
+}
+
+//------------------------------------------------------------------------------
+
+bool CD3DApplication::RenderOneFrame()
+{
+    bool ret = false;
+
+    do 
+    {
+        if (mWindow == nullptr)
+        {
+            break;
+        }
+
+        mWindow->Update();
+
+        mWindow->Render();
+
+        ret = true;
+    } while (0);
+
+    return ret;
+}
+
+//------------------------------------------------------------------------------
+
+void CD3DApplication::ReleaseD3D()
+{
+    SAFE_RELEASE(mD3D);
+}
+
+//------------------------------------------------------------------------------
+
+void CD3DApplication::applicationDidFinishLaunching()
+{
+    mWindow = new CD3DWindow();
+    mWindow->Create("D3D9 Samples", SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED, 667, 375, 
+        SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+}
+
+//------------------------------------------------------------------------------
+
+void CD3DApplication::applicationDidEnterBackground()
+{
+
+}
+
+//------------------------------------------------------------------------------
+
+void CD3DApplication::applicationWillEnterForeground()
+{
+
+}
+
+//------------------------------------------------------------------------------
+
+void CD3DApplication::applicationWillTerminate()
+{
+    if (mWindow != nullptr)
+    {
+        mWindow->Destroy();
+        SAFE_DELETE(mWindow);
+    }
+}
+
+//------------------------------------------------------------------------------
+
+void CD3DApplication::applicationLowMemory()
+{
+
 }

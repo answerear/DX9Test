@@ -22,21 +22,53 @@
  * SOFTWARE.
  ******************************************************************************/
 
-#ifndef __D3D_INIT_APP_H__
-#define __D3D_INIT_APP_H__
+
+#ifndef __D3D_WINDOW_H__
+#define __D3D_WINDOW_H__
 
 
-#include "D3DApplication.h"
+#include "D3DPrerequisites.h"
 
 
-class CD3DInitApp : public CD3DApplication
+class CD3DWindow
 {
 public:
     /// Constructor.
-    CD3DInitApp();
+    CD3DWindow();
     /// Destructor.
-    virtual ~CD3DInitApp();
+    virtual ~CD3DWindow();
+
+    /// Create window.
+    bool Create(const char *title, int32_t x, int32_t y, 
+        int32_t w, int32_t h, uint32_t flags);
+    /// Destroy window.
+    void Destroy();
+    /// Render window.
+    bool Render();
+
+    virtual bool Clear();
+
+    /// Update per frame.
+    virtual bool Update();
+    /// Render with Direct3D 9 per frame.
+    virtual bool RenderD3D();
+
+    /// Retrieve handle to the window.
+    HWND GetHWnd() { return mHWnd; }
+
+protected:
+    /// Create IDirect3D9Device object.
+    virtual bool CreateD3DDevice(uint32_t quality = 8, bool fullscreen = false, 
+        bool vsync = true);
+
+    bool checkMultiSampleQuality(LPDIRECT3D9 pD3D, D3DMULTISAMPLE_TYPE type,
+        DWORD *outQuality, D3DFORMAT fBack, D3DFORMAT fDepth,
+        UINT adapterNum, D3DDEVTYPE deviceType, BOOL fullScreen);
+
+    SDL_Window          *mSDLWindow;
+    HWND                mHWnd;
+    IDirect3DDevice9    *mD3DDevice;
 };
 
 
-#endif  /*__D3D_INIT_APP_H__*/
+#endif	/*__D3D_WINDOW_H__*/

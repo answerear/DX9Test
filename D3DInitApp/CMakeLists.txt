@@ -10,7 +10,8 @@ set_project_name(D3DInitApp)
 
 # Setup project include files path
 include_directories(
-    "${CMAKE_CURRENT_SOURCE_DIR}/Include"
+	"${D3D9_COMMON_PATH}"
+    "${CMAKE_CURRENT_SOURCE_DIR}"
     "${DirectX9_INCLUDE_DIR}"
     "${SDL2_INCLUDE_DIR}"
     )
@@ -37,6 +38,12 @@ target_link_libraries(
     ${DirectX9_LIBRARIES}
     )
 
+add_custom_command(TARGET ${BIN_NAME}
+    PRE_LINK
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE}
+    COMMAND ${CMAKE_COMMAND} -E copy ${SDL2_BINARY} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG}
+    COMMAND ${CMAKE_COMMAND} -E copy ${SDL2_BINARY} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE}
+    )
 
 # Setup install files and path for Windows.
 install(TARGETS ${BIN_NAME}
